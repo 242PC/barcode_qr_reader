@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Scanner Launcher</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding-top: 3rem; }
+    button { padding: 1.2rem 2.5rem; font-size: 1.3rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <button id="launchBtn">スキャナーを起動する</button>
+
+  <script>
+    const githubUrl = "<?= githubUrl ?>";
+    const gasUrl = "<?= gasUrl ?>";
+    let lastSentCode = "";
+
+    document.getElementById('launchBtn').onclick = () => {
+      const scanWindow = window.open(githubUrl, '_blank');
+      if (!scanWindow) return alert("ポップアップを許可してください");
+
+      setInterval(async () => {
+        if (scanWindow.closed) return;
+        try {
+          const text = await navigator.clipboard.readText();
+          if (text && text !== lastSentCode && text.trim() !== "") {
+            lastSentCode = text;
+            google.script.run.saveData(text);
+          }
+        } catch (e) {}
+      }, 400);
+
+      const injectTimer = setInterval(() => {
+        try {
+          const target = scanWindow.document.getElementById("result");
+          if (target) {
+            clearInterval(injectTimer);
+            const observer = new scanWindow.MutationObserver(() => {
+              const txt = target.textContent;
+              if (txt.startsWith("Result: ")) {
+                const code = txt.replace("Result: ", "").trim();
+                scanWindow.navigator.clipboard.writeText(code);
+                target.style.backgroundColor = "#e0ffe0";
+                setTimeout(() => { target.style.backgroundColor = "transparent"; }, 400);
+              }
+            });
+            observer.observe(target, { childList: true, characterData: true, subtree: true });
+          }
+        } catch(err) {}
+      }, 500);
+    };
+  </script>
+</body>
+</html>
