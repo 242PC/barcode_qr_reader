@@ -1,0 +1,13 @@
+<!doctype html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QR & Barcode Reader</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>body{max-width:520px;margin:2rem auto;padding:0 1rem;font:18px system-ui;text-align:center}#reader{margin:auto}#result{overflow-wrap:anywhere}</style>
+<h1>QR & Barcode Reader</h1>
+<div id="reader"></div>
+<p id="result">Use the scanner controls above.</p>
+<script>
+const result = document.querySelector('#result');
+if (typeof Html5QrcodeScanner === 'undefined') result.textContent = 'Scanner failed to load. Check your internet connection.';
+else new Html5QrcodeScanner('reader', { fps: 10, qrbox: 300, rememberLastUsedCamera: true }).render(text => result.textContent = `Result: ${text}`);
+</script>
