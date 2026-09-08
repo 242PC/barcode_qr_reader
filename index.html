@@ -1,13 +1,52 @@
 <!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>QR & Barcode Reader</title>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<style>body{max-width:520px;margin:2rem auto;padding:0 1rem;font:18px system-ui;text-align:center}#reader{margin:auto}#result{overflow-wrap:anywhere}</style>
+<style>body{max-width:520px;margin:2rem auto;padding:0 1rem;font:18px system-ui;text-align:center}video{display:block;width:100%;max-height:70vh;margin:1rem auto;background:#111}button{padding:.8rem 1.2rem;font-size:1rem}#result{overflow-wrap:anywhere}</style>
 <h1>QR & Barcode Reader</h1>
-<div id="reader"></div>
-<p id="result">Use the scanner controls above.</p>
-<script>
-const result = document.querySelector('#result');
-if (typeof Html5QrcodeScanner === 'undefined') result.textContent = 'Scanner failed to load. Check your internet connection.';
-else new Html5QrcodeScanner('reader', { fps: 10, qrbox: 300, rememberLastUsedCamera: true }).render(text => result.textContent = `Result: ${text}`);
+<video id="video" muted playsinline></video>
+<button id="start">Start camera</button>
+<button id="stop" disabled>Stop</button>
+<input id="file" type="file" accept="image/*">
+<p id="result">Tap Start camera and allow access.</p>
+<script type="module">
+const $=id=>document.getElementById(id),video=$('video'),result=$('result'),start=$('start'),stop=$('stop'),file=$('file');
+const canvas=document.createElement('canvas');
+let stream,running=false,scanImageData;
+
+async function scan(){
+	if(!running||!video.videoWidth)return setTimeout(scan,100);
+	const scale=Math.min(1,1600/video.videoWidth),width=Math.round(video.videoWidth*scale),height=Math.round(video.videoHeight*scale);
+	canvas.width=width;canvas.height=height;
+	const ctx=canvas.getContext('2d',{willReadFrequently:true});
+	ctx.drawImage(video,0,0,width,height);
+	try{const code=(await scanImageData(ctx.getImageData(0,0,width,height)))[0];if(code)result.textContent=`Result: ${code.decode()}`}
+	catch(error){result.textContent=`Scanning; point at a code...`;}
+	setTimeout(scan,120);
+}
+
+async function startCamera(){
+	start.disabled=true;result.textContent='Starting camera and ZBar...';
+	try{
+		if(!navigator.mediaDevices)throw new Error('Camera API unavailable; use HTTPS or localhost');
+		stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});
+				video.srcObject=stream;await video.play();
+				if(!video.videoWidth)await new Promise(resolve=>video.addEventListener('loadedmetadata',resolve,{once:true}));
+				stop.disabled=false;result.textContent='Camera started; loading ZBar...';
+		({scanImageData}=await import('https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.11.0/dist/index.mjs'));
+		running=true;result.textContent='Point the camera at a QR code or barcode.';scan();
+	}catch(error){start.disabled=false;result.textContent=`Camera error: ${error.message||error}`}
+}
+
+function stopCamera(){running=false;stream?.getTracks().forEach(track=>track.stop());stream=null;video.srcObject=null;start.disabled=false;stop.disabled=true;result.textContent='Tap Start camera to scan again.'}
+start.onclick=startCamera;stop.onclick=stopCamera;
+file.onchange=async()=>{
+	try{
+		if(!file.files[0])return;
+		if(!scanImageData)({scanImageData}=await import('https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.11.0/dist/index.mjs'));
+		const image=await createImageBitmap(file.files[0]),ctx=canvas.getContext('2d');
+		canvas.width=image.width;canvas.height=image.height;ctx.drawImage(image,0,0);
+		const code=(await scanImageData(ctx.getImageData(0,0,image.width,image.height)))[0];
+		result.textContent=code?`Result: ${code.decode()}`:'No barcode found in image.';
+	}catch(error){result.textContent=`Image scan error: ${error.message||error}`}
+};
 </script>
